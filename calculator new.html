@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f2ee;
+    --card: #ffffff;
+    --border: #e4ded4;
+    --text: #211d1a;
+    --text-muted: #6d6259;
+    --accent: #4a4fd6;
+    --accent-soft: #e8e9fa;
+    --key: #f6f3ef;
+    --key-hover: #ebe6df;
+    --danger: #d9534f;
+    --shadow: 0 20px 40px -20px rgba(33, 29, 26, 0.25);
+    --radius: 18px;
+    --transition: 0.2s cubic-bezier(.4,0,.2,1);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+    transition: background var(--transition), color var(--transition);
+  }
+  .app { width: 100%; max-width: 340px; position: relative; }
+  header { text-align: center; margin-bottom: 20px; padding-top: 8px; }
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 24px;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    transition: background var(--transition), border-color var(--transition);
+  }
+  .display {
+    background: var(--accent-soft);
+    border-radius: 12px;
+    padding: 16px 16px 14px;
+    margin-bottom: 16px;
+    text-align: right;
+    min-height: 78px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
+  }
+  .expression {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--text-muted);
+    min-height: 18px;
+    white-space: nowrap;
+    overflow-x: auto;
+  }
+  .current {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 32px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow-x: auto;
+    letter-spacing: -0.01em;
+  }
+  .current.error { color: var(--danger); font-size: 24px; }
+  .keys {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  button.key {
+    border: none;
+    background: var(--key);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 17px;
+    font-weight: 500;
+    padding: 16px 0;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background var(--transition), transform 0.08s;
+  }
+  button.key:hover { background: var(--key-hover); }
+  button.key:active { transform: scale(0.94); }
+  button.key:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.op {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  button.equals {
+    background: var(--accent);
+    color: #ffffff;
+    font-weight: 600;
+  }
+  button.equals:hover { background: var(--accent); filter: brightness(1.05); }
+  button.clear, button.back {
+    background: transparent;
+    color: var(--danger);
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .span-2 { grid-column: span 2; }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1>Calculator</h1></header>
+
+  <div class="card">
+    <div class="display">
+      <div class="expression" id="expression">&nbsp;</div>
+      <div class="current" id="current">0</div>
+    </div>
+
+    <div class="keys">
+      <button class="key clear span-2" data-action="clear">CLEAR</button>
+      <button class="key back" data-action="back">⌫</button>
+      <button class="key op" data-op="/">÷</button>
+
+      <button class="key" data-num="7">7</button>
+      <button class="key" data-num="8">8</button>
+      <button class="key" data-num="9">9</button>
+      <button class="key op" data-op="*">×</button>
+
+      <button class="key" data-num="4">4</button>
+      <button class="key" data-num="5">5</button>
+      <button class="key" data-num="6">6</button>
+      <button class="key op" data-op="-">−</button>
+
+      <button class="key" data-num="1">1</button>
+      <button class="key" data-num="2">2</button>
+      <button class="key" data-num="3">3</button>
+      <button class="key op" data-op="+">+</button>
+
+      <button class="key" data-num="0" style="grid-column: span 2;">0</button>
+      <button class="key" data-num=".">.</button>
+      <button class="key equals" data-action="equals">=</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const expressionEl = document.getElementById('expression');
+  const currentEl = document.getElementById('current');
+
+  let expression = '';   // full running expression as typed, e.g. "12+8*"
+  let justEvaluated = false;
+
+  const OPERATORS = ['+', '-', '*', '/'];
+
+  function lastChar() {
+    return expression.slice(-1);
+  }
+
+  function isOperator(ch) {
+    return OPERATORS.includes(ch);
+  }
+
+  function appendNumber(digit) {
+    if (justEvaluated) {
+      expression = '';
+      justEvaluated = false;
+    }
+    if (digit === '.' ) {
+      const parts = expression.split(/[+\-*/]/);
+      const currentSegment = parts[parts.length - 1];
+      if (currentSegment.includes('.')) return;
+      if (currentSegment === '') expression += '0';
+    }
+    expression += digit;
+    render();
+  }
+
+  function appendOperator(op) {
+    justEvaluated = false;
+    if (expression === '') {
+      if (op === '-') { expression = '-'; render(); }
+      return;
+    }
+    if (isOperator(lastChar())) {
+      expression = expression.slice(0, -1) + op;
+    } else {
+      expression += op;
+    }
+    render();
+  }
+
+  function backspace() {
+    justEvaluated = false;
+    expression = expression.slice(0, -1);
+    render();
+  }
+
+  function clearAll() {
+    expression = '';
+    justEvaluated = false;
+    render();
+  }
+
+  // --- Safe expression evaluator (tokenize -> shunting-yard -> RPN eval) ---
+  function tokenize(expr) {
+    const tokens = [];
+    let numBuf = '';
+    for (let i = 0; i < expr.length; i++) {
+      const ch = expr[i];
+      if (/[0-9.]/.test(ch)) {
+        numBuf += ch;
+      } else if (isOperator(ch)) {
+        if (ch === '-' && numBuf === '' && (tokens.length === 0 || isOperator(tokens[tokens.length - 1]))) {
+          numBuf += '-'; // unary minus
+        } else {
+          if (numBuf !== '') { tokens.push(numBuf); numBuf = ''; }
+          tokens.push(ch);
+        }
+      }
+    }
+    if (numBuf !== '') tokens.push(numBuf);
+    return tokens;
+  }
+
+  function toRPN(tokens) {
+    const precedence = { '+': 1, '-': 1, '*': 2, '/': 2 };
+    const output = [];
+    const ops = [];
+    tokens.forEach(token => {
+      if (isOperator(token) && token.length === 1) {
+        while (ops.length && precedence[ops[ops.length - 1]] >= precedence[token]) {
+          output.push(ops.pop());
+        }
+        ops.push(token);
+      } else {
+        output.push(token);
+      }
+    });
+    while (ops.length) output.push(ops.pop());
+    return output;
+  }
+
+  function evalRPN(rpn) {
+    const stack = [];
+    rpn.forEach(token => {
+      if (isOperator(token) && token.length === 1) {
+        const b = stack.pop();
+        const a = stack.pop();
+        let result;
+        if (token === '+') result = a + b;
+        else if (token === '-') result = a - b;
+        else if (token === '*') result = a * b;
+        else if (token === '/') {
+          if (b === 0) throw new Error('Division by zero');
+          result = a / b;
+        }
+        stack.push(result);
+      } else {
+        stack.push(parseFloat(token));
+      }
+    });
+    if (stack.length !== 1 || isNaN(stack[0])) throw new Error('Invalid expression');
+    return stack[0];
+  }
+
+  function evaluate() {
+    if (expression === '' || isOperator(lastChar())) return;
+    try {
+      const tokens = tokenize(expression);
+      const rpn = toRPN(tokens);
+      const result = evalRPN(rpn);
+      const rounded = Math.round(result * 1e10) / 1e10;
+      expressionEl.textContent = expression + ' =';
+      currentEl.textContent = rounded;
+      currentEl.classList.remove('error');
+      expression = String(rounded);
+      justEvaluated = true;
+    } catch (e) {
+      currentEl.textContent = e.message === 'Division by zero' ? "Can't divide by zero" : 'Error';
+      currentEl.classList.add('error');
+      expression = '';
+      justEvaluated = true;
+    }
+  }
+
+  function render() {
+    expressionEl.innerHTML = expression === '' ? '&nbsp;' : escapeHtml(expression);
+    currentEl.textContent = expression === '' ? '0' : expression;
+    currentEl.classList.remove('error');
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  }
+
+  document.querySelectorAll('.key[data-num]').forEach(btn => {
+    btn.addEventListener('click', () => appendNumber(btn.dataset.num));
+  });
+  document.querySelectorAll('.key[data-op]').forEach(btn => {
+    btn.addEventListener('click', () => appendOperator(btn.dataset.op));
+  });
+  document.querySelector('[data-action="equals"]').addEventListener('click', evaluate);
+  document.querySelector('[data-action="clear"]').addEventListener('click', clearAll);
+  document.querySelector('[data-action="back"]').addEventListener('click', backspace);
+
+  document.addEventListener('keydown', (e) => {
+    if (/[0-9.]/.test(e.key)) appendNumber(e.key);
+    else if (isOperator(e.key)) appendOperator(e.key);
+    else if (e.key === 'Enter' || e.key === '=') { e.preventDefault(); evaluate(); }
+    else if (e.key === 'Backspace') backspace();
+    else if (e.key === 'Escape') clearAll();
+  });
+
+  render();
+</script>
+</body>
+</html>
